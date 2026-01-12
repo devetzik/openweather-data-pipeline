@@ -47,9 +47,45 @@ Clone the repository:
 ```bash
 git clone [https://github.com/devetzik/weather-pipeline-homelab.git](https://github.com/devetzik/weather-pipeline-homelab.git)
 cd weather-pipeline-homelab
+```
 
 ### 3. Configuration
 Create the environment file from the template:
 ```bash
 cp env.example .env
+```
+Edit the .env file to match your network subnet and target location.
+
+### 4. Launch
+Build and run the stack:
+```
+docker compose up -d --build
+```
+### 5. Apply Network Shim (Linux/TrueNAS)
+If you are running on a host that needs access to the containers, apply the bridge:
+```
+sudo ./scripts/shim_setup.sh
+```
+
+## 📊 Sample Analytics (SQL)
+The data schema supports complex analytical queries.
+
+Query: The "Comfort Gap" (Actual vs. RealFeel) Visualizes wind chill effects by comparing temperature_c with apparent_temp_c.
+```
+SELECT 
+    timestamp, 
+    temperature_c as "Actual", 
+    apparent_temp_c as "Feels Like" 
+FROM weather_data 
+WHERE timestamp > NOW() - INTERVAL '48 hours'
+ORDER BY timestamp ASC;
+```
+
+Query: Storm Prediction (Pressure Drop) Rapid drops in pressure_hpa indicate approaching storm fronts.
+```
+SELECT timestamp, pressure_hpa 
+FROM weather_data 
+WHERE timestamp > NOW() - INTERVAL '3 days';
+```
+
 
