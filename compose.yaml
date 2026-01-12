@@ -1,0 +1,42 @@
+services:
+  postgres_weather:
+    container_name: postgres_weather
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      TZ: ${TZ}
+    networks:
+      lan_network:
+        ipv4_address: ${DB_IP}
+    volumes:
+      - ${VOLUME_PATH}
+
+  weather_etl:
+    container_name: weather_etl
+    build: ${BUILD_PATH}
+    restart: unless-stopped
+    environment:
+      - DB_HOST=${DB_IP}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - TZ=${TZ}
+    networks:
+      lan_network:
+        ipv4_address: ${ETL_IP}
+    depends_on:
+      - postgres_weather
+
+networks:
+  lan_network:
+    driver: macvlan
+    driver_opts:
+      parent: br0
+    ipam:
+      config:
+        - gateway: 192.168.1.1
+          subnet: 192.168.1.0/24
+    name: lan_network
