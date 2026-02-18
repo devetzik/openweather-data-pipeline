@@ -12,7 +12,7 @@ services:
       lan_network:
         ipv4_address: ${DB_IP}
     volumes:
-      - ${VOLUME_PATH}
+      - ${VOLUME_PATH}:/var/lib/postgresql/data
 
   weather_etl:
     container_name: weather_etl
@@ -24,6 +24,8 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
       - TZ=${TZ}
+      - LATITUDE=${LATITUDE}
+      - LONGITUDE=${LONGITUDE}
     networks:
       lan_network:
         ipv4_address: ${ETL_IP}
