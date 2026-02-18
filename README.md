@@ -10,16 +10,14 @@ The database was tested, connected to pgAdmin4 for queries and administration an
 ```
 open-meteo-data-pipeline/
 ├── app/
-│   ├── Dockerfile           # Uses python:3.9-slim 
+│   ├── Dockerfile            
 │   ├── etl.py               # Main ETL script 
 │   └── requirements.txt     # Python dependencies 
 ├── docker/
 │   ├── compose.yaml         # Docker Compose configuration
 │   └── env.example          # Template for environment variables
-├── images/
-│   └── dashboard.png        # Example visualization of the data
-├── postgres_data/           # Local volume bind for DB persistence
-└── README.md
+└── images/
+    └── dashboard.png        # Example visualization of the data
 ```
 
 ## How it works
