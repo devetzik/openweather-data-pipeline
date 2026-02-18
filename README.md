@@ -1,91 +1,71 @@
-# 🌦️ End-to-End Weather ETL Pipeline (Home Lab)
+# Open-Meteo Data Pipeline
 
-A robust, containerized ETL pipeline running on **TrueNAS Scale**. It extracts real-time meteorological data, transforms it for analytics, and loads it into a PostgreSQL data warehouse for visualization.
+A lightweight, containerized ETL (Extract, Transform, Load) pipeline that fetches real-time weather data from the Open-Meteo API and stores it in a local PostgreSQL database.
 
-![Dashboard Preview](images/dashboard.png)
-*(A view of the Metabase dashboard tracking temperature, pressure trends, and precipitation)*
+This project is built to run continuously as a background data job, pulling rich weather metrics for a specific geographic location every 15 minutes.
 
-## 🎯 Engineering Goal
-To engineer a fault-tolerant data pipeline that overcomes the networking isolation limitations of **Docker Macvlan** on Linux hosts, enabling a full "Extract-Load-Visualize" lifecycle for local weather metrics.
+The database was tested, connected to pgAdmin4 for queries and administration and connected to Metabase for visualizing the data.
 
-## 🏗️ Architecture & Tech Stack
+## Project Structure
+open-meteo-data-pipeline/
+├── app/
+│   ├── Dockerfile           # Uses python:3.9-slim 
+│   ├── etl.py               # Main ETL script 
+│   └── requirements.txt     # Python dependencies 
+├── docker/
+│   ├── compose.yaml         # Docker Compose configuration
+│   └── env.example          # Template for environment variables
+├── images/
+│   └── dashboard.png        # Example visualization of the data
+├── postgres_data/           # Local volume bind for DB persistence
+└── README.md
 
-| Component | Technology | Role |
-| :--- | :--- | :--- |
-| **Extract** | Python (Requests) | Fetches real-time data from Open-Meteo API. |
-| **Transform** | Pandas | Normalizes timestamps, cleans data, and calculates rich metrics (Apparent Temp, Pressure). |
-| **Load** | PostgreSQL 15 | Persistent storage with time-series data and idempotent insertion logic. |
-| **Infrastructure** | Docker Compose | Multi-container orchestration. |
-| **Networking** | Macvlan & Shim | **Custom Host Bridge** for bidirectional communication on TrueNAS. |
-| **Visualization** | Metabase | Business Intelligence dashboarding and trend analysis. |
+## How it works
+1. Database Initialization: On startup, the script connects to PostgreSQL and ensures the weather_data table exists.
+2. Extraction: Polls the Open-Meteo API for current weather conditions at the configured coordinates.
+3. Transformation: Uses Pandas to process the JSON response into a flat structure.
+4. Loading: Inserts the data into PostgreSQL. It uses primary keys to ignore duplicate data points if the pipeline restarts or overlaps.
+5. Scheduling: The script sleeps for 15 minutes before executing the next run. (Better orchestration coming soon)
 
-## ⚙️ Key Engineering Challenges
-
-### 1. Network Bridging (The "Shim")
-**The Problem:** I utilized the Docker `macvlan` driver to give my containers dedicated physical LAN IPs (`192.168.1.x`). However, by kernel design, Macvlan interfaces are isolated from the parent host, preventing the TrueNAS host (and the ETL worker) from accessing the database via its storage IP.
-
-**The Solution:** Engineered a custom Shell script (`scripts/shim_setup.sh`) that:
-1. Creates a virtual bridge interface (`shim0`) on the host.
-2. Manually routes traffic destined for the container IPs through this bridge.
-3. Establishes full bidirectional connectivity between the Host and the Macvlan containers.
-
-### 2. Idempotency & Data Integrity
+## Idempotency & Data Integrity
 The pipeline is designed to be "crash-proof." It can be restarted multiple times without corrupting the dataset:
 * **Duplicate Handling:** The ETL script catches `SQLAlchemy.exc.IntegrityError` (UniqueConstraint violations). If a record for a specific timestamp already exists, it is gracefully skipped.
 * **Self-Healing Schema:** The `init_db` module checks for the table's existence on startup. If missing, it automatically generates the schema with all 10+ metric columns.
 * **Smart Retries:** Implements connection backoff logic to wait for the database container to become ready before attempting execution.
 
-## 🚀 Deployment
+## Data Schema
+The pipeline collects the following rich metrics:
 
-### 1. Prerequisites
+* timestamp (Primary Key)
+* latitude
+* longitude
+* temperature_c
+* apparent_temp_c
+* humidity
+* wind_speed_kmh
+* pressure_hpa
+* precipitation_mm
+* cloud_cover
+* weather_code
+
+## Deployment
+
+### Prerequisites
 * Docker & Docker Compose
-* A Linux host (Debian/TrueNAS Scale recommended)
-* Network interface availability (e.g., `br0` or `eth0`)
 
-### 2. Installation
-Clone the repository:
+### 1. Configure the environment
+Clone the repository, navigate to the docker directory and copy the example environment file to create your own .env file:
 ```bash
-git clone [https://github.com/devetzik/weather-pipeline-homelab.git](https://github.com/devetzik/weather-pipeline-homelab.git)
-cd weather-pipeline-homelab
-```
-
-### 3. Configuration
-Create the environment file from the template:
-```bash
+git clone [https://github.com/devetzik/open-meteo-data-pipeline.git](https://github.com/devetzik/open-meteo-data-pipeline.git)
+cd open-meteo-data-pipeline
+cd docker
 cp env.example .env
 ```
-Edit the .env file to match your network subnet and target location.
+Open .env and configure your settings. You can set the target location by updating the decimal coordinates LATITUDE and LONGITUDE. Ensure the BUILD_PATH and VOLUME_PATH correctly point to ../app and ../postgres_data respectively.
 
-### 4. Launch
+### 2. Run the pipeline
 Build and run the stack:
 ```
 docker compose up -d --build
 ```
-### 5. Apply Network Shim (Linux/TrueNAS)
-If you are running on a host that needs access to the containers, apply the bridge:
-```
-sudo ./scripts/shim_setup.sh
-```
-
-## 📊 Sample Analytics (SQL)
-The data schema supports complex analytical queries.
-
-Query: The "Comfort Gap" (Actual vs. RealFeel) Visualizes wind chill effects by comparing temperature_c with apparent_temp_c.
-```
-SELECT 
-    timestamp, 
-    temperature_c as "Actual", 
-    apparent_temp_c as "Feels Like" 
-FROM weather_data 
-WHERE timestamp > NOW() - INTERVAL '48 hours'
-ORDER BY timestamp ASC;
-```
-
-Query: Storm Prediction (Pressure Drop) Rapid drops in pressure_hpa indicate approaching storm fronts.
-```
-SELECT timestamp, pressure_hpa 
-FROM weather_data 
-WHERE timestamp > NOW() - INTERVAL '3 days';
-```
-
-
+During the build phase, the Dockerfile will install the required Python packages cleanly to keep the image size small. The etl.py script will automatically start running.
