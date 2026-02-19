@@ -21,9 +21,10 @@ if not all([DB_USER, DB_PASS, DB_HOST, DB_NAME]):
 # Database Connection URI
 DATABASE_URI = f'postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}'
 
+
+# Retry logic for database connection
 def get_engine():
-    """Retry logic for database connection"""
-    while True:
+    while True:      
         try:
             engine = create_engine(DATABASE_URI)
             # Test connection
@@ -35,8 +36,9 @@ def get_engine():
             print(f"Database not ready yet. Retrying in 5 seconds... Error: {e}")
             time.sleep(5)
 
+
+#Create the table if it doesn't exist
 def init_db(engine):
-    """Create the table if it doesn't exist."""
     create_table_query = """
     CREATE TABLE IF NOT EXISTS weather_data (
         timestamp TIMESTAMP PRIMARY KEY,
@@ -45,14 +47,11 @@ def init_db(engine):
         temperature_c FLOAT,
         humidity INT,
         weather_code INT,
-        
-        -- New Rich Metrics
         apparent_temp_c FLOAT,
         wind_speed_kmh FLOAT,
         pressure_hpa FLOAT,
         precipitation_mm FLOAT,
         cloud_cover INT,
-        
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """
@@ -82,11 +81,9 @@ def run_pipeline(engine):
             "timestamp": pd.to_datetime(current['time']),
             "latitude": data['latitude'],
             "longitude": data['longitude'],
-
             "temperature_c": current['temperature_2m'],
             "humidity": current['relative_humidity_2m'],
             "weather_code": current['weather_code'],
-
             "apparent_temp_c": current['apparent_temperature'],
             "wind_speed_kmh": current['wind_speed_10m'],
             "pressure_hpa": current['pressure_msl'],

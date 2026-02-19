@@ -1,5 +1,7 @@
 requests==2.32.3
 pandas==2.2.3
 sqlalchemy==2.0.36
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.11  
 python-dotenv==1.0.1
+'''psycopg2 library is thePostgreSQL adapter for Python, I chose 
+the binary version for easier installation (no need for C compiler)'''
